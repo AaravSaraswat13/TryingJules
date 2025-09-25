@@ -19,6 +19,7 @@ const catPrev   = document.getElementById('catPrev');
 
 const basicHost = document.getElementById('basic');
 const colorHost = document.getElementById('color');
+const chartButtons = Array.from(document.querySelectorAll('[data-chart-mode]'));
 
 // ----- State
 const MAX_PREVIEW = 1400;
@@ -29,6 +30,8 @@ const srcCanvas = document.createElement('canvas');
 const srcCtx    = srcCanvas.getContext('2d');
 
 let zoom = 1, panX = 0, panY = 0;
+let chartMode = 'rgb';
+let lastChartStats = null;
 
 // Core settings (kept small to avoid overload)
 let S = {
@@ -60,6 +63,20 @@ const groups = {
 
 buildControls(basicHost, groups.basic);
 buildControls(colorHost, groups.color);
+
+chartButtons.forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const mode = btn.dataset.chartMode;
+    if(!mode || mode === chartMode) return;
+    chartMode = mode;
+    chartButtons.forEach(b=>{
+      const active = b === btn;
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    if(lastChartStats) drawChart(lastChartStats);
+  });
+});
 
 function buildControls(host, defs){
   defs.forEach(([key,min,max,val,step])=>{
@@ -132,7 +149,8 @@ function render(){
   pctx.drawImage(temp, 0,0,pw,ph, panX,panY,dw,dh);
 
   // histogram + navigator
-  drawHistogram(imgData);
+  lastChartStats = computeHistogram(imgData);
+  drawChart(lastChartStats);
   drawNavigator(temp);
   exportBtn.disabled = false; // ready to export
 }
@@ -197,25 +215,104 @@ function clamp(x,a,b){ return Math.max(a, Math.min(b,x)); }
 function mix(a,b,t){ return a*(1-t)+b*t; }
 function smoothstep(a,b,x){ x=clamp((x-a)/(b-a),0,1); return x*x*(3-2*x); }
 
-// ----- Histogram (RGB lines)
-function drawHistogram(imgData){
-  const w = hist.width = hist.clientWidth || 300;
-  const h = hist.height = hist.clientHeight || 70;
+// ----- Histogram / chart modes
+function computeHistogram(imgData){
   const bins = 256;
-  const rArr=new Uint32Array(bins), gArr=new Uint32Array(bins), bArr=new Uint32Array(bins);
+  const r = new Uint32Array(bins);
+  const g = new Uint32Array(bins);
+  const b = new Uint32Array(bins);
+  const luma = new Uint32Array(bins);
   const d = imgData.data;
-  for(let i=0;i<d.length;i+=4){ rArr[d[i]]++; gArr[d[i+1]]++; bArr[d[i+2]]++; }
-  const max = Math.max(Math.max(...rArr),Math.max(...gArr),Math.max(...bArr));
-  hctx.clearRect(0,0,w,h);
-  drawLine(rArr,'#ff7b7b'); drawLine(gArr,'#5bf0b8'); drawLine(bArr,'#7aa8ff');
-  function drawLine(arr,color){
-    hctx.beginPath();
-    for(let i=0;i<bins;i++){
-      const v = arr[i]/max; const y = h - v*h;
-      i===0 ? hctx.moveTo(0,y) : hctx.lineTo((i/bins)*w, y);
-    }
-    hctx.strokeStyle=color; hctx.lineWidth=1; hctx.stroke();
+  for(let i=0;i<d.length;i+=4){
+    const ri = d[i];
+    const gi = d[i+1];
+    const bi = d[i+2];
+    r[ri]++;
+    g[gi]++;
+    b[bi]++;
+    const li = Math.max(0, Math.min(255, Math.round(0.2126*ri + 0.7152*gi + 0.0722*bi)));
+    luma[li]++;
   }
+  const maxRGB = Math.max(Math.max(...r), Math.max(...g), Math.max(...b));
+  const maxLuma = Math.max(...luma);
+  return { bins, r, g, b, luma, maxRGB: Math.max(maxRGB, 1), maxLuma: Math.max(maxLuma, 1) };
+}
+
+function drawChart(stats){
+  if(!stats) return;
+  const w = hist.width = hist.clientWidth || 300;
+  const h = hist.height = hist.clientHeight || 80;
+  hctx.clearRect(0,0,w,h);
+
+  if(chartMode === 'rgb'){
+    drawOverlay(stats, w, h);
+  } else if(chartMode === 'channels'){
+    drawStacked(stats, w, h);
+  } else {
+    drawLuma(stats, w, h);
+  }
+}
+
+function drawOverlay(stats, w, h){
+  const colors = [
+    ['#ff7b7b', stats.r, stats.maxRGB],
+    ['#5bf0b8', stats.g, stats.maxRGB],
+    ['#7aa8ff', stats.b, stats.maxRGB]
+  ];
+  colors.forEach(([color, arr, max])=>{
+    hctx.beginPath();
+    for(let i=0;i<stats.bins;i++){
+      const v = arr[i]/max;
+      const x = (i/(stats.bins-1))*w;
+      const y = h - v*h;
+      i===0 ? hctx.moveTo(x,y) : hctx.lineTo(x,y);
+    }
+    hctx.strokeStyle = color;
+    hctx.lineWidth = 1.2;
+    hctx.globalAlpha = 0.85;
+    hctx.stroke();
+    hctx.globalAlpha = 1;
+  });
+}
+
+function drawStacked(stats, w, h){
+  const barWidth = Math.max(1, w/stats.bins);
+  for(let i=0;i<stats.bins;i++){
+    let offset = 0;
+    const segments = [
+      ['rgba(255,123,123,0.65)', stats.r[i]],
+      ['rgba(91,240,184,0.65)', stats.g[i]],
+      ['rgba(122,168,255,0.65)', stats.b[i]]
+    ];
+    segments.forEach(([color,val])=>{
+      if(!val) return;
+      const hVal = (val / stats.maxRGB) * h;
+      hctx.fillStyle = color;
+      hctx.fillRect(i*barWidth, h - offset - hVal, Math.ceil(barWidth), hVal);
+      offset += hVal;
+    });
+  }
+}
+
+function drawLuma(stats, w, h){
+  hctx.beginPath();
+  for(let i=0;i<stats.bins;i++){
+    const v = stats.luma[i] / stats.maxLuma;
+    const x = (i/(stats.bins-1))*w;
+    const y = h - v*h;
+    i===0 ? hctx.moveTo(x,y) : hctx.lineTo(x,y);
+  }
+  hctx.lineTo(w, h);
+  hctx.lineTo(0, h);
+  hctx.closePath();
+  const gradient = hctx.createLinearGradient(0,0,0,h);
+  gradient.addColorStop(0,'rgba(139,168,255,0.65)');
+  gradient.addColorStop(1,'rgba(30,40,70,0.05)');
+  hctx.fillStyle = gradient;
+  hctx.fill();
+  hctx.strokeStyle = 'rgba(139,168,255,0.9)';
+  hctx.lineWidth = 1.4;
+  hctx.stroke();
 }
 
 // ----- Navigator

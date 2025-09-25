@@ -45,7 +45,14 @@
     <aside class="right">
       <section class="card">
         <header><h3>Histogram</h3><span id="sizeInfo">—</span></header>
-        <div class="card-body"><canvas id="hist" class="hist"></canvas></div>
+        <div class="card-body">
+          <div class="chart-modes" role="tablist" aria-label="Chart display modes">
+            <button class="chip active" data-chart-mode="rgb" role="tab" aria-selected="true">RGB Overlay</button>
+            <button class="chip" data-chart-mode="channels" role="tab" aria-selected="false">Channel Bars</button>
+            <button class="chip" data-chart-mode="luma" role="tab" aria-selected="false">Luminance</button>
+          </div>
+          <canvas id="hist" class="hist" role="img" aria-label="Histogram visualization"></canvas>
+        </div>
       </section>
 
       <section class="card">
