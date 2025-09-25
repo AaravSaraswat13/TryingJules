@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Nile.com — Pro Editor (Lite)</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <strong>Nile.com</strong>
+      <span class="tag">Pro Photo Editor · Lite</span>
+    </div>
+    <div class="actions">
+      <input id="fileInput" type="file" accept="image/*" hidden />
+      <button class="btn" id="uploadBtn">Import…</button>
+      <button class="btn" id="resetBtn" disabled>Reset</button>
+      <button class="btn primary" id="exportBtn" disabled>Export</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Lightroom-ish left panel -->
+    <aside class="left">
+      <section class="card">
+        <header><h3>Navigator</h3><span id="zoomLabel">FIT</span></header>
+        <div class="card-body">
+          <canvas id="nav" class="nav"></canvas>
+          <div class="meta"><span id="fitPct">—</span><span id="dims">—</span></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <header><h3>Catalog</h3><span>library</span></header>
+        <div class="list">
+          <div class="row"><span>All Photographs</span><small id="catAll">0</small></div>
+          <div class="row"><span>Previous Import</span><small id="catPrev">0</small></div>
+        </div>
+      </section>
+    </aside>
+
+    <!-- Develop panel -->
+    <aside class="right">
+      <section class="card">
+        <header><h3>Histogram</h3><span id="sizeInfo">—</span></header>
+        <div class="card-body"><canvas id="hist" class="hist"></canvas></div>
+      </section>
+
+      <section class="card">
+        <header><h3>Basic</h3><span>global</span></header>
+        <div class="card-body controls" id="basic"></div>
+      </section>
+
+      <section class="card">
+        <header><h3>Color</h3><span>WB & Vibrance</span></header>
+        <div class="card-body controls" id="color"></div>
+      </section>
+    </aside>
+
+    <!-- Canvas stage -->
+    <section class="stage">
+      <canvas id="preview"></canvas>
+    </section>
+  </main>
+
+  <footer class="foot">Tip: Click “Import” → drag sliders → “Export”. Click inside “Navigator” to pan.</footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
